@@ -158,7 +158,14 @@ let auto=true;
 function showDashboard(){document.getElementById('landing').classList.add('hidden');document.getElementById('app').classList.remove('hidden');}
 function toggleAuto(){auto=!auto;document.getElementById('autoToggle').classList.toggle('on',auto);document.getElementById('statusText').textContent=auto?'يعمل تلقائياً':'متوقف';document.getElementById('systemValue').textContent=auto?'يعمل تلقائياً':'متوقف';}
 function addTime(){const t=prompt('أدخل وقت النشر (مثال 22:00):','22:00');if(t){const s=document.createElement('span');s.textContent=t;document.getElementById('timeList').insertBefore(s,document.getElementById('timeList').lastElementChild);}}
-function generateContent(){const b=event.currentTarget;b.textContent='✦ جاري إنشاء المحتوى...';b.disabled=true;setTimeout(()=>{b.textContent='✓ تم إنشاء المحتوى بنجاح';setTimeout(()=>{b.textContent='✦ إنشاء محتوى بالذكاء الاصطناعي';b.disabled=false;},1800)},1500)}
+async function generateContent(){
+  showDashboard();
+  const createBtn = document.querySelector("#page-dashboard .generate");
+  if(createBtn){createBtn.textContent="✦ جاري الاتصال بالذكاء الاصطناعي...";createBtn.disabled=true;}
+  switchPage("create", document.querySelector(".menu button:nth-child(2)"));
+  await generateCareContent();
+  if(createBtn){createBtn.textContent="✦ إنشاء محتوى بالذكاء الاصطناعي";createBtn.disabled=false;}
+}
 
 const skinIdeas=[
 "إذا بشرتك تحسّيها تشد بعد الغسيل، ماشي لازم يعني تحتاجي منتجات بزاف؛ غالباً تحتاجي تنظيف ألطف وترطيب بسيط.",
@@ -176,21 +183,73 @@ const openings=["شوفي هذي النصيحة الصغيرة 👇","بزاف �
 const closings=["المهم الاستمرارية وماشي كثرة المنتجات ✨","خلي روتينك بسيط وراقبي واش يناسبك 💛","كل بشرة وشعر مختلف، خذي وقتك باش تعرفي واش يناسبك 🌿"];
 function pick(a){return a[Math.floor(Math.random()*a.length)]}
 function escapeHtml(s){return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
-function generateCareContent(){
+async function generateCareContent(){
+ const button=event?.currentTarget;
  const topic=document.getElementById("careTopic").value;
- const type=document.getElementById("careType").value;
+ const careType=document.getElementById("careType").value;
  const style=document.querySelector("#visualChips .selected")?.textContent||"Minimal";
- let pool=topic==="skin"?skinIdeas:topic==="hair"?hairIdeas:[...skinIdeas,...hairIdeas];
- let idea=pick(pool), title=topic==="hair"?"نصيحة بسيطة لشعرك":"نصيحة بسيطة لبشرتك";
- if(topic==="both") title="نصيحة عناية بسيطة";
- const caption=`${pick(openings)}\n\n${idea}\n\n${pick(closings)}\n\nملاحظة: إذا كان عندك مشكل مستمر أو تهيّج، الأحسن تستاشري مختص.`;
- const hashtags=topic==="hair"?"#العناية_بالشعر #شعر #نصائح_شعر #الجزائر #dz #روتين":"#العناية_بالبشرة #بشرة #نصائح_بشرة #الجزائر #dz #روتين";
- const visual=`تصميم ${style} عمودي 9:16، بدون أشخاص وبدون وجوه وبدون حيوانات. عناصر عناية فقط: ${topic==="hair"?"عبوة شامبو أنيقة، منشفة قطنية، مشط خشبي، أوراق نباتية":"عبوة مرطب بسيطة، منشفة قطنية، قطرات ماء، أوراق نباتية"}، إضاءة استوديو ناعمة، خلفية فاخرة نظيفة، تصوير منتجات احترافي، تفاصيل واقعية، مساحة واضحة للنص العربي، بدون كتابة مولدة داخل الصورة.`;
- const prompt=`Create a premium editorial product still life for TikTok, vertical 9:16. ${visual}. No humans, no faces, no people, no animals, no living beings. High-end commercial photography, natural textures, realistic materials, soft shadows.`;
- const item={id:Date.now(),title,idea,caption,hashtags,prompt,createdAt:new Date().toLocaleString("ar-DZ")};
- const arr=JSON.parse(localStorage.getItem("autotikCare")||"[]");arr.unshift(item);localStorage.setItem("autotikCare",JSON.stringify(arr));
- document.getElementById("careResult").innerHTML=`<div class="generatedResult"><h4>${escapeHtml(title)}</h4><div class="resultImage">✦<br>تصميم مقترح بدون ذوات أرواح<br><small>${escapeHtml(style)} • جودة تحريرية عالية • 9:16</small></div><div class="resultBox"><b>النصيحة:</b><br>${escapeHtml(idea)}</div><div class="resultBox"><b>Caption بالدارجة الجزائرية:</b><br>${escapeHtml(caption).replace(/\n/g,"<br>")}</div><div class="resultBox"><b>Hashtags:</b><br>${hashtags}</div><div class="resultBox"><b>Image Prompt:</b><br>${escapeHtml(prompt)}</div><div class="resultActions"><button onclick="copyLatest('caption')">نسخ Caption</button><button onclick="copyLatest('prompt')">نسخ Prompt الصورة</button><button onclick="scheduleLatest()">جدولة محلية</button></div></div>`;
- renderSaved();
+ const ratio=document.getElementById("ratio").value;
+
+ if(button){
+   button.disabled=true;
+   button.dataset.original=button.textContent;
+   button.textContent="✦ جاري إنشاء محتوى حقيقي...";
+ }
+ document.getElementById("careResult").innerHTML='<div class="notice">جاري الاتصال بالخادم وإنشاء فكرة جديدة...</div>';
+
+ try{
+   const response=await fetch("/api/generate-content",{
+     method:"POST",
+     headers:{"Content-Type":"application/json"},
+     body:JSON.stringify({topic,style,careType,ratio})
+   });
+
+   const raw=await response.text();
+   let data;
+   try{data=JSON.parse(raw)}catch{throw new Error("استجابة غير صالحة من الخادم: "+raw.slice(0,180));}
+   if(!response.ok) throw new Error(data.details||data.error||"فشل إنشاء المحتوى");
+
+   const title=data.title||"نصيحة عناية";
+   const idea=data.idea||"";
+   const caption=data.caption||idea;
+   const hashtags=Array.isArray(data.hashtags)?data.hashtags.join(" "):(data.hashtags||"");
+   const prompt=data.imagePrompt||"";
+   const item={
+     id:Date.now(),title,topic,careType,style,ratio,idea,caption,hashtags,prompt,
+     status:"draft",source:"openai",createdAt:new Date().toLocaleString("ar-DZ")
+   };
+
+   const arr=JSON.parse(localStorage.getItem("autotikCare")||"[]");
+   arr.unshift(item);
+   localStorage.setItem("autotikCare",JSON.stringify(arr));
+
+   document.getElementById("careResult").innerHTML=
+     `<div class="generatedResult">
+       <h4>${escapeHtml(title)}</h4>
+       <div class="resultImage">✦<br>تم إنشاء المحتوى بنجاح<br><small>${escapeHtml(style)} • ${escapeHtml(ratio)} • بدون ذوات أرواح</small></div>
+       <div class="resultBox"><b>الفكرة/النصيحة:</b><br>${escapeHtml(idea)}</div>
+       <div class="resultBox"><b>Caption بالدارجة الجزائرية:</b><br>${escapeHtml(caption).replace(/\n/g,"<br>")}</div>
+       <div class="resultBox"><b>Hashtags:</b><br>${escapeHtml(hashtags)}</div>
+       <div class="resultBox"><b>Image Prompt:</b><br>${escapeHtml(prompt)}</div>
+       <div class="resultActions">
+         <button onclick="copyLatest('caption')">نسخ Caption</button>
+         <button onclick="copyLatest('prompt')">نسخ Prompt الصورة</button>
+         <button onclick="scheduleLatest()">جدولة محلية</button>
+       </div>
+     </div>`;
+   renderAllLocal();
+
+ }catch(err){
+   console.error(err);
+   document.getElementById("careResult").innerHTML=
+     `<div class="notice"><b>تعذر التوليد الآن.</b><br>${escapeHtml(err.message)}<br><br>
+     تأكد من: 1) حفظ OPENAI_API_KEY في Vercel، 2) إعادة Deploy، 3) وجود ملف api/generate-content.js في نفس المستودع.</div>`;
+ }finally{
+   if(button){
+     button.disabled=false;
+     button.textContent=button.dataset.original||"✦ ولّد محتوى جديد";
+   }
+ }
 }
 function latest(){const a=JSON.parse(localStorage.getItem("autotikCare")||"[]");return a[0]}
 function copyLatest(k){const x=latest();if(x){navigator.clipboard?.writeText(x[k]);alert("تم النسخ")}}
@@ -206,8 +265,7 @@ function switchPage(page,btn){
  document.getElementById('headerTitle').textContent=titles[page][0];document.getElementById('headerDesc').textContent=titles[page][1];
 }
 document.querySelectorAll('#visualChips button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#visualChips button').forEach(x=>x.classList.remove('selected'));b.classList.add('selected')});
-document.querySelectorAll('#styleChips button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#visualChips button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#visualChips button').forEach(x=>x.classList.remove('selected'));b.classList.add('selected')});
-document.querySelectorAll('#styleChips button').forEach(x=>x.classList.remove('selected'));b.classList.add('selected')});
+document.querySelectorAll('#styleChips button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#styleChips button').forEach(x=>x.classList.remove('selected'));b.classList.add('selected')});
 
 function getItems(){return JSON.parse(localStorage.getItem("autotikCare")||"[]")}
 function setItems(a){localStorage.setItem("autotikCare",JSON.stringify(a))}
