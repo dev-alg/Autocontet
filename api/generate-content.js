@@ -12,29 +12,145 @@ export default async function handler(req, res) {
     } = req.body || {};
 
     const systemPrompt = `
-أنت صانع محتوى جزائري محترف متخصص فقط في:
+أنت كاتب محتوى جزائري محترف متخصص في نصائح العناية بالبشرة والشعر.
 
-- العناية بالبشرة
-- العناية بالشعر
+اكتب دائماً باللهجة الجزائرية الطبيعية، وكأن شخصاً جزائرياً حقيقياً هو الذي كتب المحتوى.
 
-المهمة:
+المحتوى يكون:
+- طبيعي وغير متكلف.
+- باللهجة الجزائرية.
+- مفيد وعملي.
+- مناسب لمنشور TikTok.
+- قصير وجذاب.
+- غير مكرر.
+- بدون ادعاءات طبية مبالغ فيها.
+- بدون تشخيصات طبية.
 
-أنشئ محتوى جديداً ومفيداً ومناسباً لمنشور TikTok.
+المواضيع المسموحة:
+- العناية بالبشرة.
+- العناية بالشعر.
 
-مهم جداً:
+أعد النتيجة بصيغة JSON فقط وبدون أي كلام إضافي:
 
-كل النصوص العربية التي تنشئها يجب أن تكون باللهجة الجزائرية الطبيعية.
+{
+  "title": "",
+  "topic": "",
+  "idea": "",
+  "caption": "",
+  "hashtags": [],
+  "imagePrompt": ""
+}
 
-لا تستعمل العربية الفصحى إلا إذا كانت هناك كلمة علمية ضرورية.
+مهم جداً بالنسبة لـ imagePrompt:
+اكتبه باللغة الإنجليزية.
 
-يجب أن يبدو المحتوى وكأن شخصاً جزائرياً حقيقياً كتبه.
+الصورة يجب أن تكون still life photography فقط.
 
-استعمل أسلوباً بسيطاً وطبيعياً، مثل طريقة كلام الناس في الجزائر.
+يجب أن تحتوي على منتجات أو أدوات أو مكونات خاصة بالعناية بالبشرة أو الشعر.
 
-تجنب:
+ممنوع تماماً:
+- humans
+- people
+- faces
+- hands
+- animals
+- characters
+- living beings
+- body parts
+`;
 
-- الأسلوب الروبوتي
-- العبارات المكررة
+    const userPrompt = `
+أنشئ محتوى جديداً وغير مكرر.
+
+المجال المطلوب:
+${topic}
+
+الأسلوب المطلوب:
+${style}
+
+اجعل كل النصوص العربية باللهجة الجزائرية.
+`;
+
+    const response = await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.GROQ_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-oss-120b",
+          messages: [
+            {
+              role: "system",
+              content: systemPrompt
+            },
+            {
+              role: "user",
+              content: userPrompt
+            }
+          ],
+          temperature: 0.9,
+          max_tokens: 1500,
+          response_format: {
+            type: "json_object"
+          }
+        })
+      }
+    );
+
+    const responseText = await response.text();
+
+    if (!response.ok) {
+      console.error("Groq API error:", responseText);
+
+      return res.status(response.status).json({
+        error: "Groq request failed",
+        details: responseText
+      });
+    }
+
+    const data = JSON.parse(responseText);
+
+    const messageContent =
+      data?.choices?.[0]?.message?.content;
+
+    if (!messageContent) {
+      return res.status(500).json({
+        error: "No content returned from Groq"
+      });
+    }
+
+    let content;
+
+    try {
+      content = JSON.parse(messageContent);
+    } catch (parseError) {
+      console.error(
+        "JSON parsing error:",
+        messageContent
+      );
+
+      return res.status(500).json({
+        error: "Invalid JSON returned by model",
+        details: messageContent
+      });
+    }
+
+    return res.status(200).json(content);
+
+  } catch (error) {
+
+    console.error("Server error:", error);
+
+    return res.status(500).json({
+      error: "Server error",
+      details: error.message
+    });
+
+  }
+}- العبارات المكررة
 - المبالغة
 - الوعود الطبية
 - التشخيص الطبي
