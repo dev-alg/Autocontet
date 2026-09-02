@@ -1,4 +1,4 @@
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({
       error: "Method not allowed"
@@ -14,27 +14,127 @@ export default async function handler(req, res) {
     const systemPrompt = `
 أنت كاتب محتوى جزائري محترف متخصص في نصائح العناية بالبشرة والشعر.
 
-اكتب دائماً باللهجة الجزائرية الطبيعية، وكأن شخصاً جزائرياً حقيقياً هو الذي كتب المحتوى.
+اكتب جميع النتائج باللهجة الجزائرية الطبيعية.
 
-المحتوى يكون:
-- طبيعي وغير متكلف.
-- باللهجة الجزائرية.
-- مفيد وعملي.
-- مناسب لمنشور TikTok.
-- قصير وجذاب.
-- غير مكرر.
-- بدون ادعاءات طبية مبالغ فيها.
-- بدون تشخيصات طبية.
+المحتوى يجب أن:
+- يكون باللهجة الجزائرية.
+- يبدو مكتوباً بطريقة بشرية وطبيعية.
+- يكون مفيداً وعملياً.
+- لا يبالغ في الوعود الطبية.
+- لا يقدم تشخيصاً طبياً.
+- يكون مناسباً لمنشور TikTok.
+- يكون قصيراً وجذاباً.
+- يتجنب العبارات المتكررة والمصطنعة.
 
 المواضيع المسموحة:
-- العناية بالبشرة.
-- العناية بالشعر.
+العناية بالبشرة والعناية بالشعر.
 
-أعد النتيجة بصيغة JSON فقط وبدون أي كلام إضافي:
+أعد النتيجة بصيغة JSON فقط بالشكل التالي:
 
 {
   "title": "",
   "topic": "",
+  "idea": "",
+  "caption": "",
+  "hashtags": [],
+  "imagePrompt": ""
+}
+
+مهم جداً:
+- title باللهجة الجزائرية.
+- topic باللهجة الجزائرية.
+- idea باللهجة الجزائرية.
+- caption باللهجة الجزائرية.
+- hashtags يمكن أن تكون عربية أو فرنسية أو إنجليزية حسب المناسبة.
+
+بالنسبة لـ imagePrompt:
+اكتبه باللغة الإنجليزية فقط.
+
+أنشئ وصفاً لصورة عالية الجودة.
+
+الصورة يجب أن تحتوي على:
+- منتجات أو أدوات أو مكونات للعناية بالبشرة أو الشعر.
+- ترتيب جميل واحترافي.
+- still life photography.
+
+ولا يجب أن تحتوي أبداً على:
+- humans
+- people
+- faces
+- hands
+- animals
+- characters
+- living beings
+- body parts
+`;
+
+    const userPrompt = `
+أنشئ فكرة جديدة وغير مكررة.
+
+المجال:
+${topic}
+
+الأسلوب:
+${style}
+`;
+
+    const response = await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.GROQ_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-oss-120b",
+          response_format: {
+            type: "json_object"
+          },
+          messages: [
+            {
+              role: "system",
+              content: systemPrompt
+            },
+            {
+              role: "user",
+              content: userPrompt
+            }
+          ]
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+
+      console.error("Groq API error:", error);
+
+      return res.status(500).json({
+        error: "Groq request failed",
+        details: error
+      });
+    }
+
+    const data = await response.json();
+
+    const content = JSON.parse(
+      data.choices[0].message.content
+    );
+
+    return res.status(200).json(content);
+
+  } catch (error) {
+
+    console.error("Server error:", error);
+
+    return res.status(500).json({
+      error: "Failed to generate content",
+      details: error.message
+    });
+
+  }
+};  "topic": "",
   "idea": "",
   "caption": "",
   "hashtags": [],
